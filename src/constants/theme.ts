@@ -18,9 +18,9 @@ export const Colors = {
     // UI Helpers
     text: '#171e19',
     textSecondary: '#b7c6c2',
-    border: 'rgba(183, 198, 194, 0.3)',
+    border: 'rgba(23, 30, 25, 0.6)',
     glass: 'rgba(255, 255, 255, 0.8)',
-    glassBorder: 'rgba(183, 198, 194, 0.2)',
+    glassBorder: 'rgba(23, 30, 25, 0.3)',
     
     // Status
     success: '#10b981',
@@ -38,9 +38,9 @@ export const Colors = {
     
     text: '#ffffff',
     textSecondary: '#b7c6c2',
-    border: 'rgba(183, 198, 194, 0.1)',
+    border: 'rgba(255, 255, 255, 0.4)',
     glass: 'rgba(38, 45, 40, 0.8)',
-    glassBorder: 'rgba(183, 198, 194, 0.1)',
+    glassBorder: 'rgba(255, 255, 255, 0.3)',
     
     success: '#10b981',
     warning: '#f59e0b',
@@ -68,12 +68,12 @@ export const BorderRadius = {
 };
 
 export const Fonts = {
-  regular: 'Nunito_400Regular',
-  bold: 'Nunito_700Bold',
-  extraBold: 'Nunito_800ExtraBold',
-  black: 'Nunito_900Black',
-  display: 'LeagueSpartan_900Black',
-  displayBold: 'LeagueSpartan_700Bold',
+  regular: 'Roboto_400Regular',
+  bold: 'Roboto_700Bold',
+  extraBold: 'Roboto_700Bold', // Roboto doesn't have 800 by default in this package
+  black: 'Roboto_900Black',
+  display: 'Roboto_900Black',
+  displayBold: 'Roboto_700Bold',
 };
 
 export const Typography = {
@@ -110,13 +110,13 @@ export const Typography = {
     fontSize: 10,
     fontFamily: Fonts.black,
     letterSpacing: 1.5,
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
   },
   utility: {
     fontSize: 12,
     fontFamily: Fonts.displayBold,
     letterSpacing: 1,
-    textTransform: 'uppercase' as const,
+    textTransform: 'none' as const,
   },
   small: {
     fontSize: 12,
@@ -151,6 +151,13 @@ export const Shadows = {
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+  },
+  strong: {
+    shadowColor: '#171e19',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 10,
   }
 };
 

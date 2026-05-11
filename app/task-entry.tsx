@@ -1,1 +1,2 @@
-export { default } from '@/screens/Dashboard/TaskEntryScreen';
+import TaskEntryScreen from '@/screens/Dashboard/TaskEntryScreen';
+export default TaskEntryScreen;

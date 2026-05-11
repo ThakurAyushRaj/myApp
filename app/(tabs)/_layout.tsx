@@ -18,23 +18,37 @@ export default function TabLayout() {
         tabBarInactiveTintColor: '#b7c6c2',
         headerShown: false,
         tabBarStyle: styles.tabBar,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+          marginBottom: 4,
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
+          title: "Home",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          title: "Calendar",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "calendar" : "calendar-outline"} size={24} color={color} />
+          ),
+        }}
+      />
       
-      {/* 
-        Center FAB: Pointing to the new unique 'task-entry' route
-      */}
       <Tabs.Screen
         name="create"
         options={{
+          tabBarLabel: () => null,
           tabBarButton: () => (
             <View style={styles.fabWrapper}>
                <TouchableOpacity 
@@ -52,8 +66,19 @@ export default function TabLayout() {
       <Tabs.Screen
         name="explore"
         options={{
+          title: "Activity",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "stats-chart" : "stats-chart-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "settings" : "settings-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -67,7 +92,9 @@ const styles = StyleSheet.create({
     bottom: 24,
     left: 20,
     right: 20,
-    height: 64,
+    height: 75,
+    paddingBottom: 10,
+    paddingTop: 8,
     backgroundColor: '#171e19',
     borderRadius: 32,
     borderTopWidth: 0,

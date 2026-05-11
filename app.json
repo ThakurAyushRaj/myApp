@@ -1,11 +1,12 @@
 {
   "expo": {
-    "name": "myApp",
-    "slug": "myApp",
+    "name": "Time Lineup",
+    "slug": "time-lineup",
+    "owner": "rajayush",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./src/assets/images/applogo.png",
-    "scheme": "myapp",
+    "icon": "./src/assets/images/appicon.png",
+    "scheme": "time-lineup",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -13,28 +14,40 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./src/assets/images/applogo.png"
+        "backgroundColor": "#171E19",
+        "foregroundImage": "./src/assets/images/appicon.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.rajayush.timelineup",
+      "permissions": ["SCHEDULE_EXACT_ALARM", "VIBRATE"]
     },
     "web": {
       "output": "static",
-      "favicon": "./src/assets/images/applogo.png"
+      "favicon": "./src/assets/images/appicon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./src/assets/images/applogo.png",
+          "image": "./src/assets/images/appicon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-notifications",
+        {
+          "icon": "./src/assets/images/appicon.png",
+          "color": "#0052ff"
         }
       ]
     ],
