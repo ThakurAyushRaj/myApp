@@ -20,7 +20,13 @@ export function AddTaskModal({ visible, onClose }: AddTaskModalProps) {
 
   const handleAdd = () => {
     if (title.trim()) {
-      addTask(title, time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      addTask(
+        title, 
+        new Date().toISOString().split('T')[0], 
+        time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        'Medium',
+        'General'
+      );
       setTitle('');
       setTime('');
       onClose();
@@ -129,7 +135,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bold,
     color: '#171e19',
     borderWidth: 1,
-    borderColor: 'rgba(183, 198, 194, 0.3)',
+    borderColor: '#171e19',
   },
   primaryBtn: {
     height: 64,

@@ -22,7 +22,7 @@ export function Widget({ title, subtitle, iconName, onPress, accent }: WidgetPro
     <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={styles.touchable}>
       <GlassCard style={[styles.card, accent && { backgroundColor: '#0052ff' }]}>
         <View style={styles.header}>
-           <View style={[styles.iconHolder, { backgroundColor: accent ? 'rgba(255,255,255,0.2)' : 'rgba(202, 0, 19, 0.1)' }]}>
+           <View style={[styles.iconHolder, { backgroundColor: accent ? 'rgba(255,255,255,0.2)' : theme.accent + '1A' }]}>
              <Ionicons name={iconName} size={28} color={accent ? '#ffffff' : '#0052ff'} />
            </View>
         </View>
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(183, 198, 194, 0.3)',
+    borderColor: '#171e19',
     backgroundColor: '#ffffff',
     borderRadius: BorderRadius.md, // 24px for nested/secondary widgets
   },

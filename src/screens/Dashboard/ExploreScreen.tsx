@@ -1,223 +1,210 @@
 import React from 'react';
-import { StyleSheet, View, ScrollView, SafeAreaView, TouchableOpacity, Dimensions } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, SectionList } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useTasks } from '@/context/TaskContext';
+import { useTasks, Task, Priority } from '@/context/TaskContext';
 import { useAppTheme } from '@/context/ThemeContext';
-import { Colors, Spacing, BorderRadius, Shadows, Typography, Fonts } from '@/constants/theme';
+import { Colors, Spacing, Typography, Fonts, Shadows } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedText } from '@/components/common/themed-text';
 import { ThemedView } from '@/components/common/themed-view';
 import { RevealUp } from '@/components/common/reveal-up';
 
-const { width } = Dimensions.get('window');
-
-export default function InsightsScreen() {
-  const { tasks, toggleTask } = useTasks();
+export default function AllActivitiesScreen() {
+  const { tasks } = useTasks();
   const { isDark } = useAppTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const theme = Colors[isDark ? 'dark' : 'light'];
 
-  // Split tasks for staggered effect
-  const leftColumnTasks = tasks.filter((_, i) => i % 2 === 0);
-  const rightColumnTasks = tasks.filter((_, i) => i % 2 !== 0);
+  const todayStr = (() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+
+  const sections = [
+    {
+      title: "TODAY'S ACTIVITIES",
+      data: tasks.filter(t => t.date === todayStr),
+    },
+    {
+      title: 'UPCOMING ACTIVITIES',
+      data: tasks
+        .filter(t => t.date > todayStr)
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    },
+    {
+      title: 'PAST HISTORY',
+      data: tasks
+        .filter(t => t.date < todayStr)
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    },
+  ].filter(section => section.data.length > 0);
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <RevealUp delay={100}>
-            <View style={styles.header}>
-              <View style={styles.titleRow}>
-                <View style={[styles.titleIndicator, { backgroundColor: '#0052ff' }]} />
-                <ThemedText style={styles.labelText}>INSIGHTS — 2026</ThemedText>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <ThemedText style={styles.title}>All Activities</ThemedText>
-                {/* Secondary FAB for Explore Screen */}
-                <TouchableOpacity 
-                  style={styles.headerAddBtn}
-                  onPress={() => router.push('/task-entry')}
-                >
-                  <Ionicons name="add" size={24} color="white" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </RevealUp>
-
-          <View style={styles.staggeredContainer}>
-            <View style={styles.column}>
-              {leftColumnTasks.map((task, index) => (
-                <RevealUp key={task.id} delay={200 + index * 100}>
-                  <TouchableOpacity 
-                    style={styles.taskItem} 
-                    onPress={() => toggleTask(task.id)}
-                    activeOpacity={0.9}
+      <View style={[styles.safeArea, { paddingTop: insets.top }]}>
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.scrollContent}
+          stickySectionHeadersEnabled={false}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <RevealUp delay={100}>
+              <View style={styles.header}>
+                {/* Small label: OVERVIEW — 2026 (appears ABOVE "All Activities") */}
+                <View style={styles.titleRow}>
+                  <View style={[styles.titleIndicator, { backgroundColor: theme.accent }]} />
+                  <ThemedText style={[styles.labelText, { color: theme.textSecondary }]}>OVERVIEW — {new Date().getFullYear()}</ThemedText>
+                </View>
+                {/* Big title + Add button row (appears BELOW label) */}
+                <View style={styles.headerMain}>
+                  <ThemedText style={[styles.title, { color: theme.primary }]}>All Activities</ThemedText>
+                  <TouchableOpacity
+                    style={[styles.headerAddBtn, { backgroundColor: theme.accent }]}
+                    onPress={() => router.push('/task-entry')}
                   >
-                    <View style={styles.cardSurface}>
-                       <ThemedText style={styles.categoryBadge}>Task</ThemedText>
-                       {task.done && (
-                        <View style={styles.doneOverlay}>
-                           <Ionicons name="checkmark-circle" size={32} color="white" />
-                        </View>
-                       )}
-                    </View>
-                    <View style={styles.itemMeta}>
-                      <ThemedText style={styles.itemTitle}>{task.title}</ThemedText>
-                      <ThemedText style={styles.itemSubtitle}>{task.time} • PRIORITY</ThemedText>
-                    </View>
+                    <Ionicons name="add" size={24} color="white" />
                   </TouchableOpacity>
-                </RevealUp>
-              ))}
-            </View>
-
-            <View style={[styles.column, { marginTop: 60 }]}>
-              {rightColumnTasks.map((task, index) => (
-                <RevealUp key={task.id} delay={300 + index * 100}>
-                  <TouchableOpacity 
-                    style={styles.taskItem} 
-                    onPress={() => toggleTask(task.id)}
-                    activeOpacity={0.9}
-                  >
-                    <View style={[styles.cardSurface, { backgroundColor: '#b7c6c220' }]}>
-                       <ThemedText style={styles.categoryBadge}>Routine</ThemedText>
-                       {task.done && (
-                        <View style={styles.doneOverlay}>
-                           <Ionicons name="checkmark-circle" size={32} color="white" />
-                        </View>
-                       )}
-                    </View>
-                    <View style={styles.itemMeta}>
-                      <ThemedText style={styles.itemTitle}>{task.title}</ThemedText>
-                      <ThemedText style={styles.itemSubtitle}>{task.time} • DAILY</ThemedText>
-                    </View>
-                  </TouchableOpacity>
-                </RevealUp>
-              ))}
-            </View>
-          </View>
-
-          {tasks.length === 0 && (
-            <RevealUp delay={400}>
-              <View style={styles.emptyContainer}>
-                <ThemedText style={styles.emptyTitle}>All caught up</ThemedText>
-                <ThemedText style={styles.emptySub}>Your activity log is up to date.</ThemedText>
+                </View>
               </View>
             </RevealUp>
+          }
+          renderSectionHeader={({ section: { title } }) => (
+            <ThemedText style={[styles.sectionHeader, { color: theme.textSecondary }]}>{title}</ThemedText>
           )}
-
-          <View style={{ height: 150 }} />
-        </ScrollView>
-      </SafeAreaView>
+          renderItem={({ item, index }) => (
+            <RevealUp delay={150 + index * 50}>
+              <TaskCard task={item} onPress={() => router.push({ pathname: '/task-entry', params: { taskId: item.id } })} />
+            </RevealUp>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="calendar-outline" size={48} color={theme.textSecondary} />
+              <ThemedText style={[styles.emptyTitle, { color: theme.textSecondary }]}>No activities found</ThemedText>
+            </View>
+          }
+          ListFooterComponent={<View style={{ height: 100 }} />}
+        />
+      </View>
     </ThemedView>
   );
 }
 
+function TaskCard({ task, onPress }: { task: Task; onPress: () => void }) {
+  const { isDark } = useAppTheme();
+  const theme = Colors[isDark ? 'dark' : 'light'];
+
+  const getPriorityColor = (p: Priority) => {
+    switch (p) {
+      case 'High': return theme.accent;
+      case 'Medium': return theme.warning;
+      case 'Low': return theme.success;
+      default: return theme.accent;
+    }
+  };
+
+  const subtaskCount = task.subtasks?.length || 0;
+
+  return (
+    <TouchableOpacity
+      style={[styles.taskCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
+      <View style={styles.cardHeader}>
+        <View style={[styles.priorityPill, { backgroundColor: getPriorityColor(task.priority) + '15' }]}>
+          <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(task.priority) }]} />
+          <ThemedText style={[styles.priorityText, { color: getPriorityColor(task.priority) }]}>
+            {task.priority.toUpperCase()}
+          </ThemedText>
+        </View>
+        {task.done && <Ionicons name="checkmark-circle" size={20} color={theme.success} />}
+      </View>
+
+      <ThemedText style={[styles.cardTitle, { color: theme.primary }, task.done && styles.doneText]}>
+        {task.title}
+      </ThemedText>
+
+      <View style={styles.cardMetadata}>
+        <View style={styles.metaItem}>
+          <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+          <ThemedText style={[styles.metaText, { color: theme.textSecondary }]}>{task.date} • {task.time}</ThemedText>
+        </View>
+        {subtaskCount > 0 && (
+          <View style={styles.metaItem}>
+            <Ionicons name="list-outline" size={14} color={theme.textSecondary} />
+            <ThemedText style={[styles.metaText, { color: theme.textSecondary }]}>{subtaskCount} subtasks</ThemedText>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.cardFooter}>
+        <View style={[styles.categoryChip, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(23, 30, 25, 0.05)' }]}>
+          <ThemedText style={[styles.categoryText, { color: theme.primary }]}>{task.category}</ThemedText>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#eeebe3',
-  },
-  safeArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: Spacing.md,
-  },
-  header: {
-    marginTop: 120,
-    marginBottom: 40,
-  },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
+  scrollContent: { padding: Spacing.md },
+  // Reduced marginTop from 60 to 16 to fix the content starting too low
+  header: { marginTop: 16, marginBottom: 24 },
+  headerMain: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerAddBtn: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#0052ff',
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadows.blue,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  titleIndicator: {
-    width: 4,
-    height: 12,
-    borderRadius: 2,
-  },
-  labelText: {
-    ...Typography.label,
-    color: '#b7c6c2',
-  },
-  title: {
-    ...Typography.h1,
-    color: '#171e19',
-  },
-  staggeredContainer: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  column: {
-    flex: 1,
-  },
-  taskItem: {
-    marginBottom: 32,
-  },
-  cardSurface: {
-    aspectRatio: 1,
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(183, 198, 194, 0.3)',
-    justifyContent: 'flex-end',
-    padding: 16,
     ...Shadows.soft,
   },
-  categoryBadge: {
+  // titleRow is above headerMain so OVERVIEW shows above "All Activities"
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  titleIndicator: { width: 4, height: 12, borderRadius: 2 },
+  labelText: { ...Typography.label },
+  title: { ...Typography.h1 },
+  sectionHeader: {
     ...Typography.label,
-    fontSize: 8,
-    color: '#0052ff',
-    backgroundColor: 'rgba(202, 0, 19, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
+    marginTop: 32,
+    marginBottom: 16,
+    letterSpacing: 2,
+    marginLeft: 4,
   },
-  doneOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(23, 30, 25, 0.4)',
+  taskCard: {
     borderRadius: 24,
-    justifyContent: 'center',
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    ...Shadows.soft,
+  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  priorityPill: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 6,
   },
-  itemMeta: {
-    marginTop: 12,
-    paddingHorizontal: 4,
-  },
-  itemTitle: {
-    fontSize: 18,
-    fontFamily: Fonts.black,
-    color: '#171e19',
-  },
-  itemSubtitle: {
-    fontSize: 10,
-    fontFamily: Fonts.bold,
-    color: '#b7c6c2',
-    marginTop: 4,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 100,
-  },
-  emptyTitle: {
-    ...Typography.h2,
-    color: '#171e19',
-  },
-  emptySub: {
-    ...Typography.body,
-    color: '#b7c6c2',
-    marginTop: 8,
-  },
+  priorityDot: { width: 6, height: 6, borderRadius: 3 },
+  priorityText: { fontSize: 10, fontFamily: Fonts.black, letterSpacing: 0.5 },
+  cardTitle: { fontSize: 20, fontFamily: Fonts.bold, marginBottom: 12 },
+  cardMetadata: { gap: 8, marginBottom: 16 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { fontSize: 13, fontFamily: Fonts.regular },
+  cardFooter: { flexDirection: 'row', justifyContent: 'flex-end' },
+  categoryChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  categoryText: { fontSize: 12, fontFamily: Fonts.bold },
+  doneText: { textDecorationLine: 'line-through', opacity: 0.5 },
+  emptyContainer: { alignItems: 'center', marginTop: 100, gap: 12 },
+  emptyTitle: { fontSize: 18, fontFamily: Fonts.bold },
 });

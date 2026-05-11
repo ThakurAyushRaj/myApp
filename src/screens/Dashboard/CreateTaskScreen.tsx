@@ -12,18 +12,23 @@ import {
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { 
-  FadeInUp, 
-  Layout, 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  FadeInUp,
+  Layout,
   FadeIn,
   FadeOut,
 } from 'react-native-reanimated';
+
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { BlurView } from 'expo-blur';
 
 import { Colors, Spacing, BorderRadius, Typography, Fonts, Shadows } from '@/constants/theme';
 import { useAppTheme } from '@/context/ThemeContext';
 import { useTasks } from '@/context/TaskContext';
 import { ThemedText } from '@/components/common/themed-text';
 import { ThemedView } from '@/components/common/themed-view';
+import { CustomAlert } from '@/components/common/themed-dialog';
 
 const { width } = Dimensions.get('window');
 
@@ -47,7 +52,7 @@ const SectionTitle = ({ title, icon }: { title: string; icon: any }) => (
 );
 
 const Chip = ({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) => (
-  <TouchableOpacity 
+  <TouchableOpacity
     onPress={onPress}
     style={[styles.chip, selected && styles.chipSelected]}
     activeOpacity={0.8}
@@ -62,17 +67,41 @@ export default function AdvancedCreateTaskScreen() {
   const router = useRouter();
   const { isDark } = useAppTheme();
   const { addTask } = useTasks();
+  const insets = useSafeAreaInsets();
 
   // --- State ---
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [isAllDay, setIsAllDay] = useState(false);
+  const [taskDate, setTaskDate] = useState(new Date());
+  const [startTime, setStartTime] = useState(new Date());
+  const [endTime, setEndTime] = useState(new Date(new Date().getTime() + 60 * 60 * 1000));
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerType, setPickerType] = useState<'start' | 'end'>('start');
   const [priority, setPriority] = useState<Priority>('Medium');
   const [category, setCategory] = useState('Work');
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [newSubtask, setNewSubtask] = useState('');
   const [showMore, setShowMore] = useState(false);
   const [pomodoro, setPomodoro] = useState(false);
+
+  // Custom Alert State
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+    confirmText?: string;
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+  });
+
+  const showAlert = (title: string, message: string, onConfirm?: () => void, confirmText = 'OK') => {
+    setAlertConfig({ visible: true, title, message, onConfirm, confirmText });
+  };
 
   const titleInputRef = useRef<TextInput>(null);
 
@@ -82,6 +111,49 @@ export default function AdvancedCreateTaskScreen() {
   }, []);
 
   // --- Actions ---
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'long' });
+  };
+
+  const onTimeChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+
+    if (selectedDate) {
+      if (pickerType === 'start') {
+        setStartTime(selectedDate);
+        if (selectedDate > endTime) {
+          setEndTime(new Date(selectedDate.getTime() + 60 * 60 * 1000));
+        }
+      } else {
+        setEndTime(selectedDate);
+      }
+    }
+  };
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (selectedDate) {
+      setTaskDate(selectedDate);
+    }
+  };
+
+  const openTimePicker = (type: 'start' | 'end') => {
+    setPickerType(type);
+    setShowTimePicker(true);
+  };
+
+  const openDatePicker = () => {
+    setShowDatePicker(true);
+  };
+
   const addSubtask = () => {
     if (newSubtask.trim()) {
       setSubtasks([...subtasks, { id: Math.random().toString(), text: newSubtask, completed: false }]);
@@ -95,14 +167,36 @@ export default function AdvancedCreateTaskScreen() {
 
   const handleSave = () => {
     if (title.trim()) {
-      addTask(title, "Today"); 
+      // Past time validation
+      const now = new Date();
+      const isToday = taskDate.toDateString() === now.toDateString();
+      
+      if (isToday && !isAllDay) {
+        const startCheck = new Date(taskDate);
+        startCheck.setHours(startTime.getHours(), startTime.getMinutes(), 0, 0);
+        
+        // Allow a small buffer (e.g., 1 minute) for latency
+        if (startCheck.getTime() < now.getTime() - 60000) {
+          showAlert("Invalid Time", "You cannot schedule an activity in the past for today.");
+          return;
+        }
+      }
+
+      const dateStr = taskDate.toISOString().split('T')[0];
+      const timeStr = isAllDay ? 'All Day' : formatTime(startTime);
+      const mappedSubtasks = subtasks.map(s => ({
+        id: s.id,
+        text: s.text,
+        done: s.completed
+      }));
+      addTask(title, dateStr, timeStr, priority, category, mappedSubtasks, '10m Before', description);
       router.back();
     }
   };
 
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen 
+      <Stack.Screen
         options={{
           headerTitle: 'Log Activity',
           headerTransparent: true,
@@ -111,25 +205,25 @@ export default function AdvancedCreateTaskScreen() {
               <Ionicons name="chevron-back" size={24} color="#171e19" />
             </TouchableOpacity>
           ),
-        }} 
+        }}
       />
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 120 + insets.bottom }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           {/* 1. Main Title & Description */}
           <Animated.View entering={FadeInUp.duration(400)}>
-            <View style={[styles.card, styles.mainCard, Shadows.soft]}>
-              <ThemedText style={styles.inputLabel}>ACTIVITY NAME</ThemedText>
+            <View style={[styles.card, styles.mainCard, Shadows.soft, { backgroundColor: theme.surface }]}>
+              <ThemedText style={styles.inputLabel}>Activity Name</ThemedText>
               <TextInput
                 ref={titleInputRef}
-                style={styles.titleInput}
+                style={[styles.titleInput, { color: theme.text }]}
                 placeholder="What happened?"
                 placeholderTextColor="#b7c6c2"
                 value={title}
@@ -137,17 +231,17 @@ export default function AdvancedCreateTaskScreen() {
                 autoFocus
               />
               <TextInput
-                style={styles.descInput}
+                style={[styles.descInput, { color: theme.text }]}
                 placeholder="Add notes or details..."
                 placeholderTextColor="#b7c6c2"
                 multiline
                 value={description}
                 onChangeText={setDescription}
               />
-              
-              <View style={styles.smartInputBox}>
-                <Ionicons name="sparkles" size={14} color="#0052ff" />
-                <ThemedText style={styles.smartInputText}>
+
+              <View style={[styles.smartInputBox, { backgroundColor: theme.secondary + '15' }]}>
+                <Ionicons name="sparkles" size={14} color={theme.accent} />
+                <ThemedText style={[styles.smartInputText, { color: theme.accent }]}>
                   Try &quot;Meeting with Raj tomorrow at 5pm&quot;
                 </ThemedText>
               </View>
@@ -156,18 +250,18 @@ export default function AdvancedCreateTaskScreen() {
 
           {/* 2. Schedule */}
           <Animated.View entering={FadeInUp.delay(100).duration(400)}>
-            <View style={[styles.card, Shadows.soft]}>
+            <View style={[styles.card, Shadows.soft, { backgroundColor: theme.surface }]}>
               <SectionTitle title="Schedule" icon="calendar-outline" />
-              
+
               <View style={styles.dateTimeRow}>
-                <TouchableOpacity style={styles.datePickerBtn}>
-                  <ThemedText style={styles.datePickerLabel}>DATE</ThemedText>
-                  <ThemedText style={styles.datePickerValue}>Tue, 28 April</ThemedText>
+                <TouchableOpacity style={styles.datePickerBtn} onPress={openDatePicker}>
+                  <ThemedText style={styles.datePickerLabel}>Date</ThemedText>
+                  <ThemedText style={[styles.datePickerValue, { color: theme.text }]}>{formatDate(taskDate)}</ThemedText>
                 </TouchableOpacity>
                 <View style={styles.allDayToggle}>
-                  <ThemedText style={styles.label}>ALL DAY</ThemedText>
-                  <Switch 
-                    value={isAllDay} 
+                  <ThemedText style={styles.label}>All Day</ThemedText>
+                  <Switch
+                    value={isAllDay}
                     onValueChange={setIsAllDay}
                     trackColor={{ false: '#eeebe3', true: '#0052ff' }}
                   />
@@ -176,53 +270,75 @@ export default function AdvancedCreateTaskScreen() {
 
               {!isAllDay && (
                 <View style={styles.timePickerContainer}>
-                  <View style={styles.timeCol}>
-                    <ThemedText style={styles.label}>START</ThemedText>
-                    <ThemedText style={styles.timeValue}>09:00 AM</ThemedText>
-                  </View>
+                  <TouchableOpacity style={styles.timeCol} onPress={() => openTimePicker('start')}>
+                    <ThemedText style={styles.label}>Start</ThemedText>
+                    <ThemedText style={[styles.timeValue, { color: theme.text }]}>{formatTime(startTime)}</ThemedText>
+                  </TouchableOpacity>
                   <Ionicons name="arrow-forward" size={16} color="#b7c6c2" />
-                  <View style={styles.timeCol}>
-                    <ThemedText style={styles.label}>END</ThemedText>
-                    <ThemedText style={styles.timeValue}>10:00 AM</ThemedText>
-                  </View>
+                  <TouchableOpacity style={styles.timeCol} onPress={() => openTimePicker('end')}>
+                    <ThemedText style={styles.label}>End</ThemedText>
+                    <ThemedText style={[styles.timeValue, { color: theme.text }]}>{formatTime(endTime)}</ThemedText>
+                  </TouchableOpacity>
                 </View>
+              )}
+
+              {showTimePicker && (
+                <DateTimePicker
+                  value={pickerType === 'start' ? startTime : endTime}
+                  mode="time"
+                  is24Hour={false}
+                  display={Platform.OS === 'ios' ? 'spinner' : 'clock'}
+                  onChange={onTimeChange}
+                  themeVariant={isDark ? 'dark' : 'light'}
+                />
+              )}
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={taskDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
+                  onChange={onDateChange}
+                  themeVariant={isDark ? 'dark' : 'light'}
+                />
               )}
             </View>
           </Animated.View>
 
           {/* 3. Priority & Category */}
           <Animated.View entering={FadeInUp.delay(200).duration(400)}>
-            <View style={[styles.card, Shadows.soft]}>
+            <View style={[styles.card, Shadows.soft, { backgroundColor: theme.surface }]}>
               <SectionTitle title="Classification" icon="options-outline" />
-              
-              <ThemedText style={styles.label}>PRIORITY</ThemedText>
+
+              <ThemedText style={styles.label}>Priority</ThemedText>
               <View style={styles.priorityRow}>
                 {(['Low', 'Medium', 'High'] as Priority[]).map((p) => (
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     key={p}
                     onPress={() => setPriority(p)}
                     style={[
-                      styles.priorityBtn, 
+                      styles.priorityBtn,
+                      { backgroundColor: theme.secondary + '15' },
                       priority === p && styles.priorityBtnActive,
-                      priority === p && { backgroundColor: p === 'High' ? '#0052ff' : p === 'Medium' ? '#0052ff20' : '#b7c6c220' }
+                      priority === p && { backgroundColor: p === 'High' ? theme.accent : theme.accent + '25' }
                     ]}
                   >
-                    <View style={[styles.priorityDot, { backgroundColor: p === 'High' ? '#0052ff' : p === 'Medium' ? '#f59e0b' : '#10b981' }]} />
-                    <ThemedText style={[styles.priorityBtnText, priority === p && { color: p === 'High' ? 'white' : '#171e19' }]}>
+                    <View style={[styles.priorityDot, { backgroundColor: p === 'High' ? theme.accent : p === 'Medium' ? theme.warning : theme.success }]} />
+                    <ThemedText style={[styles.priorityBtnText, priority === p && { color: p === 'High' ? 'white' : theme.text }]}>
                       {p}
                     </ThemedText>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <ThemedText style={[styles.label, { marginTop: 20 }]}>CATEGORY</ThemedText>
+              <ThemedText style={[styles.label, { marginTop: 20 }]}>Category</ThemedText>
               <View style={styles.chipRow}>
                 {['Work', 'Personal', 'Health', 'Study'].map((cat) => (
-                  <Chip 
-                    key={cat} 
-                    label={cat} 
-                    selected={category === cat} 
-                    onPress={() => setCategory(cat)} 
+                  <Chip
+                    key={cat}
+                    label={cat}
+                    selected={category === cat}
+                    onPress={() => setCategory(cat)}
                   />
                 ))}
               </View>
@@ -231,35 +347,40 @@ export default function AdvancedCreateTaskScreen() {
 
           {/* 4. Subtasks Checklist */}
           <Animated.View entering={FadeInUp.delay(300).duration(400)}>
-            <View style={[styles.card, Shadows.soft]}>
+            <View style={[styles.card, Shadows.soft, { backgroundColor: theme.surface }]}>
               <SectionTitle title="Subtasks" icon="list-outline" />
-              
+
               {subtasks.map((item) => (
-                <Animated.View 
-                  key={item.id} 
-                  layout={Layout.springify()} 
-                  entering={FadeIn} 
+                <Animated.View
+                  key={item.id}
+                  layout={Layout.springify()}
+                  entering={FadeIn}
                   exiting={FadeOut}
-                  style={styles.subtaskItem}
+                  style={[styles.subtaskItem, { backgroundColor: theme.secondary + '15' }]}
                 >
                   <Ionicons name="ellipse-outline" size={20} color="#b7c6c2" />
-                  <ThemedText style={styles.subtaskText}>{item.text}</ThemedText>
+                  <ThemedText style={[styles.subtaskText, { color: theme.text }]}>{item.text}</ThemedText>
                   <TouchableOpacity onPress={() => removeSubtask(item.id)}>
-                    <Ionicons name="trash-outline" size={18} color="#0052ff" />
+                    <Ionicons name="trash-outline" size={18} color={theme.accent} />
                   </TouchableOpacity>
                 </Animated.View>
               ))}
 
               <View style={styles.addSubtaskContainer}>
                 <TextInput
-                  style={styles.addSubtaskInput}
+                  style={[styles.addSubtaskInput, { 
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(183,198,194,0.15)', 
+                    color: theme.text,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                  }]}
                   placeholder="Add a step..."
                   placeholderTextColor="#b7c6c2"
                   value={newSubtask}
                   onChangeText={setNewSubtask}
                   onSubmitEditing={addSubtask}
                 />
-                <TouchableOpacity onPress={addSubtask} style={styles.addSubtaskBtn}>
+                <TouchableOpacity onPress={addSubtask} style={[styles.addSubtaskBtn, { backgroundColor: theme.accent }]}>
                   <Ionicons name="add" size={24} color="white" />
                 </TouchableOpacity>
               </View>
@@ -268,75 +389,85 @@ export default function AdvancedCreateTaskScreen() {
 
           {/* 5. Productivity & Advanced */}
           <Animated.View entering={FadeInUp.delay(400).duration(400)}>
-            <View style={[styles.card, Shadows.soft]}>
+            <View style={[styles.card, Shadows.soft, { backgroundColor: theme.surface }]}>
               <View style={styles.pomodoroRow}>
                 <View style={styles.row}>
-                  <Ionicons name="timer-outline" size={22} color="#0052ff" />
-                  <ThemedText style={styles.pomodoroLabel}>Pomodoro Timer</ThemedText>
+                  <Ionicons name="timer-outline" size={22} color={theme.accent} />
+                  <ThemedText style={[styles.pomodoroLabel, { color: theme.text }]}>Pomodoro Timer</ThemedText>
                 </View>
-                <Switch 
-                  value={pomodoro} 
+                <Switch
+                  value={pomodoro}
                   onValueChange={setPomodoro}
                   trackColor={{ false: '#eeebe3', true: '#0052ff' }}
                 />
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.moreOptionsToggle}
                 onPress={() => setShowMore(!showMore)}
               >
                 <ThemedText style={styles.moreOptionsText}>
-                  {showMore ? 'HIDE OPTIONS' : 'MORE SETTINGS'}
+                  {showMore ? 'Hide Options' : 'More Settings'}
                 </ThemedText>
-                <Ionicons 
-                  name={showMore ? "chevron-up" : "chevron-down"} 
-                  size={16} 
-                  color="#b7c6c2" 
+                <Ionicons
+                  name={showMore ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color="#b7c6c2"
                 />
               </TouchableOpacity>
 
               {showMore && (
                 <Animated.View entering={FadeIn.duration(300)}>
                   <View style={styles.moreOptionsGrid}>
-                    <BentoMetricCard label="REMINDER" value="10m Before" icon="notifications-outline" />
-                    <BentoMetricCard label="DURATION" value="1 Hour" icon="hourglass-outline" />
-                    <BentoMetricCard label="RECURRING" value="Weekly" icon="repeat-outline" />
-                    <BentoMetricCard label="LOCATION" value="Not Set" icon="location-outline" />
+                    <BentoMetricCard label="Reminder" value="10m Before" icon="notifications-outline" theme={theme} isDark={isDark} />
+                    <BentoMetricCard label="Duration" value="1 Hour" icon="hourglass-outline" theme={theme} isDark={isDark} />
+                    <BentoMetricCard label="Recurring" value="Weekly" icon="repeat-outline" theme={theme} isDark={isDark} />
+                    <BentoMetricCard label="Location" value="Not Set" icon="location-outline" theme={theme} isDark={isDark} />
                   </View>
                 </Animated.View>
               )}
             </View>
           </Animated.View>
 
-          <View style={{ height: 120 }} />
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* 6. Sticky Bottom Action */}
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.saveButton} 
+      {/* Fixed Bottom Button - always visible */}
+      <View style={[styles.footer, { bottom: Math.max(insets.bottom, 20) }]}>
+        <TouchableOpacity
+          style={styles.saveButton}
           onPress={handleSave}
-          activeOpacity={0.9}
+          activeOpacity={0.8}
         >
-          <ThemedText style={styles.saveButtonText}>Create Task</ThemedText>
-          <Ionicons name="sparkles-outline" size={20} color="white" />
+          <BlurView intensity={90} tint={isDark ? 'dark' : 'light'} style={styles.blurContainer}>
+            <ThemedText style={styles.saveButtonText}>Create Task</ThemedText>
+            <Ionicons name="sparkles-outline" size={20} color="#0052ff" />
+          </BlurView>
         </TouchableOpacity>
       </View>
+
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onConfirm={alertConfig.onConfirm}
+        confirmText={alertConfig.confirmText}
+        onClose={() => setAlertConfig(prev => ({ ...prev, visible: false }))}
+      />
     </ThemedView>
   );
 }
 
-function BentoMetricCard({ label, value, icon }: { label: string, value: string, icon: any }) {
+function BentoMetricCard({ label, value, icon, theme, isDark }: { label: string, value: string, icon: any, theme: any, isDark: boolean }) {
   return (
-    <TouchableOpacity style={styles.bentoOption} activeOpacity={0.8}>
-       <View style={styles.bentoIconInner}>
-          <Ionicons name={icon} size={14} color="#0052ff" />
-       </View>
-       <View>
-          <ThemedText style={styles.label}>{label}</ThemedText>
-          <ThemedText style={styles.bentoValue}>{value}</ThemedText>
-       </View>
+    <TouchableOpacity style={[styles.bentoOption, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(183, 198, 194, 0.1)' }]} activeOpacity={0.8}>
+      <View style={[styles.bentoIconInner, { backgroundColor: theme.secondary + '20' }]}>
+        <Ionicons name={icon} size={14} color={theme.accent} />
+      </View>
+      <View>
+        <ThemedText style={styles.label}>{label}</ThemedText>
+        <ThemedText style={[styles.bentoValue, { color: theme.text }]}>{value}</ThemedText>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -344,13 +475,11 @@ function BentoMetricCard({ label, value, icon }: { label: string, value: string,
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#eeebe3',
   },
   backButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 16,
@@ -361,15 +490,15 @@ const styles = StyleSheet.create({
     paddingTop: 120,
   },
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: BorderRadius.md,
-    padding: 24,
+    borderRadius: BorderRadius.lg,
+    padding: 20,
     marginBottom: 16,
+    ...Shadows.soft,
     borderWidth: 1,
-    borderColor: 'rgba(183, 198, 194, 0.3)',
+    borderColor: '#171e19',
   },
   mainCard: {
-    borderRadius: BorderRadius.xl, 
+    borderRadius: BorderRadius.xl,
     padding: 32,
   },
   inputLabel: {
@@ -380,13 +509,11 @@ const styles = StyleSheet.create({
   titleInput: {
     fontSize: 28,
     fontFamily: Fonts.black,
-    color: '#171e19',
     marginBottom: 12,
   },
   descInput: {
     fontSize: 16,
     fontFamily: Fonts.regular,
-    color: '#171e19',
     minHeight: 60,
     textAlignVertical: 'top',
   },
@@ -394,7 +521,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(202, 0, 19, 0.05)',
     padding: 10,
     borderRadius: 12,
     marginTop: 16,
@@ -402,25 +528,27 @@ const styles = StyleSheet.create({
   smartInputText: {
     fontSize: 12,
     fontFamily: Fonts.bold,
-    color: '#0052ff',
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 12,
+    paddingLeft: 4,
   },
   sectionIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(202, 0, 19, 0.1)',
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 82, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   sectionHeaderText: {
-    ...Typography.h3,
-    color: '#171e19',
+    fontSize: 16,
+    fontFamily: Fonts.black,
+    textTransform: 'none',
+    letterSpacing: 0.5,
   },
   dateTimeRow: {
     flexDirection: 'row',
@@ -438,7 +566,6 @@ const styles = StyleSheet.create({
   datePickerValue: {
     fontSize: 18,
     fontFamily: Fonts.black,
-    color: '#171e19',
     marginTop: 4,
   },
   allDayToggle: {
@@ -455,8 +582,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 20,
     paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(183, 198, 194, 0.2)',
   },
   timeCol: {
     flex: 1,
@@ -464,7 +589,6 @@ const styles = StyleSheet.create({
   timeValue: {
     fontSize: 16,
     fontFamily: Fonts.bold,
-    color: '#171e19',
   },
   priorityRow: {
     flexDirection: 'row',
@@ -479,7 +603,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#eeebe3',
   },
   priorityBtnActive: {
     borderWidth: 1.5,
@@ -503,28 +626,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: 'rgba(183, 198, 194, 0.3)',
+    backgroundColor: 'rgba(183, 198, 194, 0.15)',
   },
   chipSelected: {
-    backgroundColor: '#171e19',
-    borderColor: '#171e19',
+    backgroundColor: '#0052ff',
+    borderColor: '#0052ff',
   },
-  chipText: {
-    fontSize: 14,
-    fontFamily: Fonts.bold,
-    color: '#171e19',
-  },
-  chipTextSelected: {
-    color: '#ffffff',
-  },
+  chipText: { fontSize: 14, fontFamily: Fonts.bold },
+  chipTextSelected: { color: '#ffffff' },
   subtaskItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     marginBottom: 12,
-    backgroundColor: '#eeebe340',
     padding: 12,
     borderRadius: 16,
   },
@@ -532,7 +646,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontFamily: Fonts.regular,
-    color: '#171e19',
   },
   addSubtaskContainer: {
     flexDirection: 'row',
@@ -542,7 +655,6 @@ const styles = StyleSheet.create({
   addSubtaskInput: {
     flex: 1,
     height: 48,
-    backgroundColor: '#eeebe3',
     borderRadius: 16,
     paddingHorizontal: 16,
     fontFamily: Fonts.regular,
@@ -551,7 +663,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: '#171e19',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -568,7 +679,6 @@ const styles = StyleSheet.create({
   pomodoroLabel: {
     fontSize: 16,
     fontFamily: Fonts.bold,
-    color: '#171e19',
   },
   moreOptionsToggle: {
     flexDirection: 'row',
@@ -577,8 +687,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 24,
     paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(183, 198, 194, 0.2)',
   },
   moreOptionsText: {
     ...Typography.label,
@@ -592,7 +700,6 @@ const styles = StyleSheet.create({
   },
   bentoOption: {
     width: (width - Spacing.md * 2 - 24 * 2 - 12) / 2,
-    backgroundColor: 'rgba(183, 198, 194, 0.1)',
     borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
@@ -603,14 +710,12 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(202, 0, 19, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   bentoValue: {
     fontSize: 12,
     fontFamily: Fonts.black,
-    color: '#171e19',
     marginTop: 2,
   },
   footer: {
@@ -620,17 +725,22 @@ const styles = StyleSheet.create({
     right: 24,
   },
   saveButton: {
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#0052ff',
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: '#0052ff',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    overflow: 'hidden',
+  },
+  blurContainer: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
-    ...Shadows.blue,
   },
   saveButtonText: {
-    color: '#ffffff',
+    color: '#0052ff',
     fontSize: 18,
     fontFamily: Fonts.black,
   },
